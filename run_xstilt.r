@@ -43,7 +43,8 @@ options(timeout = max(1500, getOption('timeout')))   # for download.file
 
 # ----------- Dependencies and API key for geolocation (must-have) ---------- #
 ## go to X-STILT dir and source functions and libraries
-homedir = '/central/home/dienwu'
+#homedir = '/central/home/dienwu'
+homedir = "/no_backup/models"
 xstilt_wd = file.path(homedir, 'X-STILT') 
 setwd(xstilt_wd); source('r/dependencies.r')
 
@@ -59,29 +60,33 @@ site = readLines('stdin', n = 1); print(site)
 # for selecting observations, if num_* is not NA
 # ENTIRE domain - site_lat +/- dlat, site_lon +/- dlon 
 # NEAR-FIELD domain - site_lat +/- nf_dlat, site_lon +/- nf_dlon
-dlon = 0.5            # e.g., dlon = 0.5 means 1 x 1 degree box around the site
-dlat = 0.5            # dlat/dlon in degrees 
-nf_dlon = 0.3
-nf_dlat = 0.3
+dlon = 0.8            # e.g., dlon = 0.5 means 1 x 1 degree box around the site
+dlat = 0.6            # dlat/dlon in degrees 
+nf_dlon = 0.5 # was 0.3
+nf_dlat = 0.5
 
 # - automatically obtain lat/lon (requires Google API key in insert_ggAPI.csv)
 # - OR mannually insert coordinates, e.g., site.loc = data.frame(lon = , lat = )
-lon_lat = get.lon.lat(site, dlon, dlat, site.loc = NULL)
-
+#lon_lat = get.lon.lat(site, dlon, dlat, site.loc = NULL)
+lon_lat = get.lon.lat(site, dlon, dlat, site.loc = data.frame(lon = -77.0, lat = 39.0))
 
 # ------------------------ I/O params (must-have) --------------------------- #
 # as a default, all input data are stored under input_path, change if you like
-input_path  = '/central/groups/POW'
-store_path  = file.path(input_path, 'XSTILT_output', site)
+#input_path  = '/central/groups/POW'
+input_path = "/no_backup/tropomi/erwh/TROPOMI_testfile"
+#store_path  = file.path(input_path, 'XSTILT_output', site)
+store_path = file.path(homedir, "XSTILT_output", site)
 
 # *** modify the info path/directory that stores OCO-2/3 or TROPOMI data -------
-obs_sensor  = c('OCO-2', 'OCO-3', 'TROPOMI', NA)[4]
+obs_sensor  = c('OCO-2', 'OCO-3', 'TROPOMI', NA)[3]
 obs_ver     = c('V11r', 'V10p4r', NA)[3]       # retrieval algo ver if there is
-obs_species = c('CO2', 'CO', 'NO2', 'CH4')[1]  # only 1 gas per run
+obs_species = c('CO2', 'CO', 'NO2', 'CH4')[4]  # only 1 gas per run
 oco_path = file.path(input_path, obs_sensor, paste0('L2_Lite_FP_', obs_ver))
 sif_path = file.path(input_path, obs_sensor, paste0('L2_Lite_SIF_', obs_ver))
-trp_path = file.path(input_path, obs_sensor, obs_species, 'L2')
-store_path = file.path(input_path, 'XSTILT_output', site)
+#trp_path = file.path(input_path, obs_sensor, obs_species, 'L2')
+trp_path = file.path(input_path)
+#store_path = file.path(input_path, 'XSTILT_output', site)
+store_path = file.path(homedir, 'XSTILT_output', site)
 if (!is.na(obs_ver)) store_path = file.path(store_path, obs_ver)
 
 
@@ -110,7 +115,7 @@ odiac_path = file.path(input_path, 'ODIAC', paste0('ODIAC', odiac_ver))
 #' @param obs_sensor == TROPOMI - daily obs, time string provided by user
 #' @param obs_sensor == NA - ideal run w/o obs, time string provided by user
 #' @param timestr in format of YYYYMMDD or YYYYMMDDHH (either works)
-timestr = '20240912'    
+timestr = '20221007'  
 if (is.na(obs_sensor)) timestr = unique(read.csv(recp_fn)$time)
 
 #' @param obs_sensor == OCO-2/3 - can help search for overpasses with #
@@ -134,7 +139,7 @@ run_emiss_err = F    # T: get XCO2 error due to prior emiss err
 run_wind_err  = F    # T: calc wind error based on RAOB 
 run_sim       = F    # T: calc XFF or error with existing foot (only for CO2)
 store_totx    = F    # T: store particles info from columns above release hgt
-nhrs          = -12  # number of hours backward (-) or forward (+)
+nhrs          = -24  # number of hours backward (-) or forward (+)
 
 # output variable names required in trajec.rds
 varstrajec = c('time', 'indx', 'lati', 'long', 'zagl', 'zsfc', 'foot', 'samt',
@@ -171,10 +176,12 @@ num_bg_lat = num_bg_lon = num_nf_lat = num_nf_lon = NA
 
 # ------------------- ARL format meteo params (must-have) -------------------- #
 # see STILTv2 https://uataq.github.io/stilt/#/configuration?id=meteorological-data-input
-met = c('gfs0p25', 'hrrr', 'wrf27km')[1]            # choose met fields
+met = c('gfs0p25', 'hrrr', 'wrf27km')[2]            # choose met fields
 met_file_tres = c('1 day', '6 hours', '1 hour')[1]  # met temporal resolution
-met_path = file.path(homedir, met)     
-met_file_format = '%Y%m%d'                          # met file name convention
+#met_path = file.path(homedir, met)    
+met_path = file.path("/no_backup/met/HRRR") 
+#met_file_format = '%Y%m%d'                          # met file name convention
+met_file_format = '%Y%m%d_%H_hrrr'     
 
 #' if you prefer to use your own metfields without downloading files from ARL, 
 #' set @param n_met_min to the min # of files needed and @param selfTF to TRUE
@@ -259,8 +266,8 @@ if (run_emiss_err) {
 # *** there is a current bug with the rslurm package, you may need to 
 # mannually pull the development version from github by doing:
 #devtools::install_github('SESYNC-ci/rslurm')               # DW, 11/6/2020
-slurm = T                           # T: SLURM parallel computing
-n_nodes = 12
+slurm = F                           # T: SLURM parallel computing
+n_nodes = 1
 n_cores = 10
 if (!slurm) n_nodes = n_cores = 1
 timeout = 12 * 60 * 60              # time allowed before terminations in sec
@@ -272,7 +279,7 @@ slurm_partition = 'expansion'
 # The ammount of memory per node you need in MB, extending to 10 GB per core
 # given 180+ GB max memory on each Caltech cluster with 32 cores
 # **** PLEASE adjust mem_per_* based on your machine
-mem_per_core = 10                                 # max memory per core in GB
+mem_per_core = 8                                 # max memory per core in GB
 mem_per_node = n_cores * mem_per_core * 1024      # max mem per node now in MB 
 
 
